@@ -6,7 +6,9 @@ host name, so DuckDB reads only the row groups that cover the requested hosts.
 """
 import csv
 import gzip
+import hashlib
 import io
+import json
 import logging
 import os
 from datetime import date
@@ -24,6 +26,14 @@ CC_DIR = DATA_DIR / "commoncrawl"
 HOSTS_FILE = CC_DIR / "hosts.csv.gz"
 CRAWLS_FILE = CC_DIR / "crawls.csv"
 QUERIED_FILE = CC_DIR / "queried.txt"
+# Crawls already backfilled for the current set of new hosts, so an interrupted backfill
+# resumes instead of querying them again
+BACKFILL_FILE = CC_DIR / "backfill.json"
+# Without limits one crawl query grew to about 4 GB and pushed the machine into swap;
+# DuckDB spills to TEMP_DIR instead
+MEMORY_LIMIT = "1GB"
+THREADS = 2
+TEMP_DIR = DATA_DIR / "cache" / "duckdb"
 PRIORITY = {"CC-MAIN-2021-49", "CC-MAIN-2022-05", "CC-MAIN-2022-21", "CC-MAIN-2022-40", "CC-MAIN-2023-14",
             "CC-MAIN-2023-50", "CC-MAIN-2024-26", "CC-MAIN-2025-05", "CC-MAIN-2025-18"}
 COLUMNS = ["fetch_200", "fetch_3xx", "fetch_4xx", "fetch_5xx", "fetch_gone", "fetch_notModified",
@@ -68,10 +78,31 @@ def _connect():
     # DuckDB httpfs honours HTTP(S)_PROXY; like the other collectors, connect directly
     for var in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
         os.environ.pop(var, None)
-    con = duckdb.connect()
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+    con = duckdb.connect(config={"memory_limit": MEMORY_LIMIT, "threads": THREADS,
+                                 "preserve_insertion_order": False, "temp_directory": str(TEMP_DIR)})
     con.execute("INSTALL httpfs; LOAD httpfs;")
     con.execute("SET http_retries = 8; SET http_retry_wait_ms = 2000; SET http_timeout = 120000;")
+    # Each crawl is read once, so caching its Parquet files only costs memory
+    con.execute("SET enable_external_file_cache = false;")
     return con
+
+
+def _hosts_key(hosts):
+    return hashlib.sha1("\n".join(sorted(hosts)).encode()).hexdigest()
+
+
+def backfill_done(new):
+    """Crawls an interrupted run already backfilled for exactly these new hosts."""
+    if not BACKFILL_FILE.exists():
+        return set()
+    state = json.loads(BACKFILL_FILE.read_text(encoding="utf-8"))
+    return set(state.get("done", [])) if state.get("hosts") == _hosts_key(new) else set()
+
+
+def save_backfill(new, done):
+    state = {"hosts": _hosts_key(new), "n": len(new), "done": sorted(done)}
+    BACKFILL_FILE.write_text(json.dumps(state, indent=1) + "\n", encoding="utf-8")
 
 
 def _query(con, crawl, urls, hosts):
@@ -135,7 +166,12 @@ def update(hosts, crawls=None):
     complete = True
     if new and backfill:
         new_set = set(new)
+        finished = backfill_done(new)
+        if finished:
+            log.info("commoncrawl: resuming backfill, %d crawls already done", len(finished & set(backfill)))
         for crawl in backfill:
+            if crawl in finished:
+                continue
             found = _query(con, crawl, files[crawl], new)
             if found is None:
                 log.warning("commoncrawl %s backfill incomplete, will retry on the next run", crawl)
@@ -144,6 +180,8 @@ def update(hosts, crawls=None):
             rows = [r for r in rows if not (r["crawl"] == crawl and r["host"] in new_set)] + found
             log.info("commoncrawl %s backfill: %d host rows for %d new hosts", crawl, len(found), len(new))
             _write(rows)
+            finished.add(crawl)
+            save_backfill(new, finished)
     for crawl in todo:
         found = _query(con, crawl, files[crawl], hosts)
         if found is None:
@@ -156,6 +194,7 @@ def update(hosts, crawls=None):
         _write(rows)
     if complete and not crawls:
         QUERIED_FILE.write_text("\n".join(sorted(queried | set(hosts))) + "\n", encoding="utf-8")
+        BACKFILL_FILE.unlink(missing_ok=True)
 
 
 def write_crawls(crawls):

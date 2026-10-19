@@ -73,6 +73,10 @@ significant sites are kept:
 `data/registry/domains.csv` is kept in the repository, so the registry only needs a
 rebuild when the source list changes. Common Crawl data is backfilled for hosts added
 to the registry; `data/commoncrawl/queried.txt` lists the hosts covered by every crawl.
+An interrupted backfill resumes: `data/commoncrawl/backfill.json` records the crawls
+already done for the current set of new hosts. DuckDB runs with a 1 GB memory limit and
+2 threads and spills to `data/cache/duckdb/`; without limits a crawl query grew to about
+4 GB.
 
 ## Commands
 

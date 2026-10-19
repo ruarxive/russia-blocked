@@ -1,7 +1,9 @@
 """Unit tests for the offline parts: python -m unittest discover tests"""
+import tempfile
 import unittest
+from pathlib import Path
 
-from rublocked import build, fingerprint, registry, wayback
+from rublocked import build, commoncrawl, fingerprint, registry, wayback
 from rublocked.common import month_range, normalize_host
 from rublocked.probe import check_vantage, derive_status, parse_robots
 from rublocked.whois import registrable
@@ -189,6 +191,22 @@ class VantageTest(unittest.TestCase):
         d = {"s": "ok", "g": "ok"}
         build._add_ru(d, None)
         self.assertNotIn("rs", d)
+
+
+
+class BackfillTest(unittest.TestCase):
+    def test_resume_only_for_same_hosts(self):
+        saved = commoncrawl.BACKFILL_FILE
+        with tempfile.TemporaryDirectory() as tmp:
+            commoncrawl.BACKFILL_FILE = Path(tmp) / "backfill.json"
+            try:
+                self.assertEqual(commoncrawl.backfill_done(["a.ru", "b.ru"]), set())
+                commoncrawl.save_backfill(["b.ru", "a.ru"], {"CC-MAIN-2022-05"})
+                self.assertEqual(commoncrawl.backfill_done(["a.ru", "b.ru"]), {"CC-MAIN-2022-05"})
+                # The registry changed: the saved progress is for other hosts
+                self.assertEqual(commoncrawl.backfill_done(["a.ru", "c.ru"]), set())
+            finally:
+                commoncrawl.BACKFILL_FILE = saved
 
 
 if __name__ == "__main__":
