@@ -1,0 +1,4 @@
+# The probe-ru image needs only these; code and data are mounted at run time
+*
+!requirements.txt
+!docker/

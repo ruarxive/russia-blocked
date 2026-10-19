@@ -7,9 +7,8 @@ import logging
 import shutil
 from datetime import date
 
-from . import commoncrawl, fingerprint, registry, wayback, whois
-from .common import DATA_DIR, SITE_DIR, START_MONTH, current_month, month_range, read_jsonl, utcnow
-from .probe import PROBES_DIR
+from . import commoncrawl, fingerprint, probe, registry, wayback, whois
+from .common import DATA_DIR, SITE_DIR, START_MONTH, current_month, month_range, utcnow
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +24,10 @@ STATUS_GROUP = {
     "dns": "gone", "lost": "gone",
 }
 GROUPS = ["ok", "waf", "noconn", "error", "gone"]
+# A live site seen from abroad and from Russia: open from both, closed only for foreign
+# visitors (geoblocking, WAF rules for foreign addresses), closed from both, or closed only
+# from the Russian network
+GEO = ["open", "geoblock", "closed", "ru_fail"]
 # The registry was compiled in 2020 and last updated in October 2022. A registrable
 # domain created after the last update was dropped and registered again by someone
 # else; one created between 2021 and that update may be a legitimate new government
@@ -36,11 +39,6 @@ SNAP_CODE = {"content": "c", "shell": "s", "challenge": "j", "blocked": "b", "em
              "client_error": "x", "server_error": "x", "none": "n"}
 BASELINE_YEAR = "2021"
 BASELINE_CRAWLS = {"CC-MAIN-2021-49", "CC-MAIN-2022-05"}
-
-
-def _latest_probe_month():
-    months = sorted(p.name.split(".")[0] for p in PROBES_DIR.glob("*.jsonl.gz"))
-    return months[-1] if months else None
 
 
 def _lost_reason(rec, who):
@@ -97,8 +95,8 @@ def active_cohort_hosts(hosts):
 
     Only these enter the archive shares, so only their snapshots need classifying.
     """
-    probe_month = _latest_probe_month()
-    probes = {r["host"]: r for r in read_jsonl(PROBES_DIR / f"{probe_month}.jsonl.gz")} if probe_month else {}
+    probe_month = probe.latest_month()
+    probes = probe.load(probe_month) if probe_month else {}
     whois_db = whois.load()
     out = []
     for host in hosts:
@@ -123,11 +121,12 @@ def build():
     this_year = date.today().year
     years = list(range(int(START_MONTH[:4]), this_year + 1))
 
-    probe_month = _latest_probe_month()
-    probes = {r["host"]: r for r in read_jsonl(PROBES_DIR / f"{probe_month}.jsonl.gz")} if probe_month else {}
-    meta = {}
-    if probe_month and (PROBES_DIR / f"{probe_month}.meta.json").exists():
-        meta = json.loads((PROBES_DIR / f"{probe_month}.meta.json").read_text(encoding="utf-8"))
+    probe_month = probe.latest_month()
+    probes = probe.load(probe_month) if probe_month else {}
+    meta = probe.load_meta(probe_month) if probe_month else {}
+    ru_month = probe.latest_month("ru")
+    probes_ru = probe.load(ru_month, "ru") if ru_month else {}
+    meta_ru = probe.load_meta(ru_month, "ru") if ru_month else {}
     snapshots = wayback.load_snapshots()
     whois_db = whois.load()
     crawls, cc_rows, cc_queried = commoncrawl.load()
@@ -197,15 +196,49 @@ def build():
             d["s"], d["g"] = "lost", "gone"
         # Only sites that still exist as government sites count in the archive shares
         d["act"] = d["s"] is None or d["g"] != "gone"
+        _add_ru(d, probes_ru.get(host))
         domains.append(d)
 
     summary = _summarize(domains, months, complete, years, crawls, cc_done, probe_month, meta)
+    summary["probe_ru"] = {"month": ru_month, "vantage": meta_ru.get("vantage"),
+                           "started_at": meta_ru.get("started_at"), "finished_at": meta_ru.get("finished_at")}
+    summary.update(_summarize_ru(domains))
     with open(OUT_DIR / "domains.json", "w", encoding="utf-8") as f:
         json.dump(domains, f, ensure_ascii=False, separators=(",", ":"))
     with open(OUT_DIR / "summary.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, separators=(",", ":"))
     _downloads(domains, months, years, probe_month)
     log.info("site data written: %d domains, probe month %s", len(domains), probe_month)
+
+
+def _add_ru(d, rec):
+    """Fields of the Russian probe and the comparison class of the two views."""
+    if not rec:
+        return
+    http = rec.get("http") or {}
+    d["rs"], d["rg"] = rec["status"], STATUS_GROUP.get(rec["status"])
+    d["rhs"], d["rhk"] = http.get("status"), http.get("kind")
+    d["rhr"] = http.get("reason") or http.get("error")
+    # Taken over or deleted domains are no longer government sites, whatever either side sees
+    if d["s"] and d["g"] != "gone":
+        ok_abroad, ok_ru = d["g"] == "ok", d["rg"] == "ok"
+        d["geo"] = ("open" if ok_ru else "ru_fail") if ok_abroad else ("geoblock" if ok_ru else "closed")
+
+
+def _summarize_ru(domains):
+    scopes = ["all"] + list(registry.CATEGORIES)
+    live_ru, geo = {}, {}
+    for scope in scopes:
+        group = [d for d in domains if (scope == "all" or d["c"] == scope) and d.get("rs")]
+        live_ru[scope] = {"n": len(group), "groups": {g: sum(1 for d in group if d["rg"] == g) for g in GROUPS}}
+        compared = [d for d in group if d.get("geo")]
+        geo[scope] = {"n": len(compared), **{k: sum(1 for d in compared if d["geo"] == k) for k in GEO}}
+    # Status group seen from abroad by status group seen from Russia, for live sites
+    matrix = {a: {r: 0 for r in GROUPS} for a in GROUPS if a != "gone"}
+    for d in domains:
+        if d.get("geo"):
+            matrix[d["g"]][d["rg"]] += 1
+    return {"live_ru": live_ru, "geo": geo, "geo_matrix": matrix}
 
 
 def _summarize(domains, months, complete, years, crawls, cc_done, probe_month, meta):
@@ -339,6 +372,7 @@ def _downloads(domains, months, years, probe_month):
     fields = ["host", "display", "category", "name", "org", "region", "live_status", "status_group",
               "ip", "asn", "asn_country", "vendors", "port_443", "port_80", "russian_trusted_ca",
               "tls_verified", "http_status", "page_kind", "title", "robots_block",
+              "ru_live_status", "ru_status_group", "ru_http_status", "ru_page_kind", "abroad_vs_russia",
               "lost_reason", "whois_created", "whois_registrar", "free_to_register",
               "wayback_captures_total", "wayback_last_200_month", "baseline_2021",
               "wayback_monthly_" + months[0] + "_" + months[-1],
@@ -349,7 +383,8 @@ def _downloads(domains, months, years, probe_month):
         for d in domains:
             w.writerow([d["h"], d["d"], d["c"], d["n"], d["o"], d["r"], d["s"], d["g"], d.get("ip"), d.get("asn"),
                         d.get("ac"), ";".join(d.get("v") or []), d.get("p443"), d.get("p80"), d.get("ruca"),
-                        d.get("tlsok"), d.get("hs"), d.get("hk"), d.get("t"), d.get("rb"), d.get("lr"), d.get("wc"),
+                        d.get("tlsok"), d.get("hs"), d.get("hk"), d.get("t"), d.get("rb"),
+                        d.get("rs"), d.get("rg"), d.get("rhs"), d.get("rhk"), d.get("geo"), d.get("lr"), d.get("wc"),
                         d.get("wr"), d.get("free"), d["wn"], d["wl"],
                         d["co"], d["wb"], d["sn"], d["ccs"]])
     for src, name in [(registry.REGISTRY_FILE, "registry.csv"), (whois.WHOIS_FILE, "whois.jsonl.gz"),
@@ -357,5 +392,6 @@ def _downloads(domains, months, years, probe_month):
                       (commoncrawl.HOSTS_FILE, "commoncrawl_hosts.csv.gz")]:
         if src.exists():
             shutil.copyfile(src, DOWNLOAD_DIR / name)
-    for path in PROBES_DIR.glob("*.jsonl.gz"):
-        shutil.copyfile(path, DOWNLOAD_DIR / f"probe_{path.name}")
+    for point, prefix in (("abroad", "probe_"), ("ru", "probe_ru_")):
+        for path in probe.VANTAGES[point]["dir"].glob("*.jsonl.gz"):
+            shutil.copyfile(path, DOWNLOAD_DIR / f"{prefix}{path.name}")

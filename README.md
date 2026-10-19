@@ -79,6 +79,7 @@ to the registry; `data/commoncrawl/queried.txt` lists the hosts covered by every
 ```bash
 .venv/bin/python -m rublocked registry      # rebuild the registry
 .venv/bin/python -m rublocked probe         # live probe of all hosts (about 45 min)
+scripts/probe-ru.sh                         # the same probe from Russia, in the VPN container
 .venv/bin/python -m rublocked whois         # WHOIS refresh
 .venv/bin/python -m rublocked wayback       # Wayback sparklines (1-3 h, archive.org rate limits)
 .venv/bin/python -m rublocked snapshots     # classify yearly Wayback snapshots
@@ -103,6 +104,30 @@ The probe must run from a network outside Russia; the vantage point (IP, country
 network) is recorded in `data/probes/YYYY-MM.meta.json` and shown on the site, so runs
 from different networks stay comparable. The probe connects directly and ignores
 `HTTP(S)_PROXY`.
+
+### Check from Russia
+
+Right after the foreign probe, `monthly` runs `scripts/probe-ru.sh`: the same probe from a
+Russian network, to tell blocking of foreign addresses apart from a site that is down for
+everyone. The AmneziaWG tunnel (WireGuard with traffic obfuscation, built from
+[amnezia-vpn](https://github.com/amnezia-vpn) sources) runs inside a Docker container
+(`docker/probe-ru/`), so it
+never changes the routing of this machine or of the collectors running meanwhile. The
+repository is mounted into the container; results go to `data/probes/ru/YYYY-MM.jsonl.gz`
+with the vantage point in `YYYY-MM.meta.json`. Names are resolved through Yandex DNS
+(77.88.8.8), and the default concurrency is 10, as one VPN exit carries all requests.
+
+* The VPN config is read from `secrets/rusgate.conf` (or `RU_VPN_CONF`). `secrets/` is in
+  `.gitignore`; the config holds a private key and must never be committed. The image does
+  not contain it, it is mounted read-only at run time.
+* Docker Desktop must be running. Without the config the step is skipped with a warning;
+  `monthly --skip probe-ru` skips it on purpose.
+* Both probes refuse to run from the wrong side of the border: the Russian one stops unless
+  the exit IP is in Russia, the foreign one stops if it is.
+* `scripts/probe-ru.sh --limit 50` or `--hosts a.ru b.ru` passes arguments to the probe.
+
+The site compares the two views when the month has a Russian probe: a site that does not
+open from abroad but opens from Russia counts as closed to foreign visitors only.
 
 To run it locally on macOS once a month, install the launchd job:
 

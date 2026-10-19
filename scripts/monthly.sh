@@ -1,5 +1,5 @@
 #!/bin/sh
-# Monthly run: probe, WHOIS, Wayback, snapshots, Common Crawl, site build.
+# Monthly run: probe from abroad and from Russia, WHOIS, Wayback, snapshots, Common Crawl, site build.
 set -eu
 cd "$(dirname "$0")/.."
 mkdir -p logs

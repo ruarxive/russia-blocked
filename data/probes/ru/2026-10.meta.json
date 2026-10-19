@@ -1,0 +1,12 @@
+{
+ "month": "2026-10",
+ "point": "ru",
+ "started_at": "2026-10-19T09:15:10+00:00",
+ "vantage": {
+  "country": "RU",
+  "city": "Moscow",
+  "org": "AS50340 JSC Selectel"
+ },
+ "hosts": 2254,
+ "finished_at": "2026-10-19T10:23:06+00:00"
+}

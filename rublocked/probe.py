@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 import ssl
+import subprocess
 import time
 from urllib.parse import urlsplit
 
@@ -23,12 +24,19 @@ from cryptography import x509
 
 from . import fingerprint
 from .asn import AsnDB
-from .common import BROWSER_UA, DATA_DIR, current_month, utcnow, write_jsonl, read_jsonl, normalize_host
+from .common import BROWSER_UA, DATA_DIR, ROOT_DIR, current_month, utcnow, write_jsonl, read_jsonl, normalize_host
 
 log = logging.getLogger(__name__)
 
 PROBES_DIR = DATA_DIR / "probes"
-DNS_SERVERS = ["8.8.8.8", "1.1.1.1"]
+# Vantage points. The main one is a network outside Russia, as foreign archive crawlers
+# see the sites; the Russian one tells geoblocking apart from a site down for everyone.
+# Each keeps its own monthly files and resolves names through resolvers of its side.
+VANTAGES = {
+    "abroad": {"dir": PROBES_DIR, "dns": ["8.8.8.8", "1.1.1.1"]},
+    "ru": {"dir": PROBES_DIR / "ru", "dns": ["77.88.8.8", "77.88.8.1"]},
+}
+RU_SCRIPT = ROOT_DIR / "scripts" / "probe-ru.sh"
 TCP_TIMEOUT = 10
 HTTP_TIMEOUT = httpx.Timeout(25, connect=12)
 HOST_TIMEOUT = 120
@@ -250,9 +258,9 @@ async def probe_host(host, resolver, client, asndb):
     return rec
 
 
-async def _run(hosts, concurrency):
+async def _run(hosts, concurrency, dns_servers):
     resolver = dns.asyncresolver.Resolver(configure=False)
-    resolver.nameservers = DNS_SERVERS
+    resolver.nameservers = dns_servers
     resolver.lifetime = 10
     asndb = AsnDB()
     limits = httpx.Limits(max_connections=concurrency * 2, max_keepalive_connections=0)
@@ -280,17 +288,37 @@ async def _run(hosts, concurrency):
     return results
 
 
-def run(hosts, month=None, concurrency=40, merge=False):
+def check_vantage(point, where):
+    """Refuse to probe when the network is on the wrong side of the border.
+
+    A run through a forgotten system VPN would otherwise be recorded as the foreign view,
+    and a Russian run whose tunnel failed as the Russian one.
+    """
+    country = where.get("country")
+    if point == "ru" and country != "RU":
+        raise RuntimeError(f"Russian vantage point expected, but the network is {where}")
+    if point == "abroad" and country == "RU":
+        raise RuntimeError(f"vantage point outside Russia expected, but the network is {where}")
+
+
+def run(hosts, month=None, concurrency=40, merge=False, point="abroad"):
     """Probe hosts; with merge=True update only these hosts in an existing month file."""
     month = month or current_month()
-    meta = {"month": month, "started_at": utcnow().isoformat(timespec="seconds"), "vantage": vantage(),
-            "hosts": len(hosts)}
-    log.info("probing %d hosts from %s", len(hosts), meta["vantage"])
-    results = asyncio.run(_run(hosts, concurrency))
+    out_dir = VANTAGES[point]["dir"]
+    meta = {"month": month, "point": point, "started_at": utcnow().isoformat(timespec="seconds"),
+            "vantage": vantage(), "hosts": len(hosts)}
+    check_vantage(point, meta["vantage"])
+    if point == "ru":
+        # The exit is a private VPN server; its address is published with the data, so keep
+        # only the city and network, or the server gets blocked
+        meta["vantage"].pop("ip", None)
+    log.info("probing %d hosts from %s (%s)", len(hosts), meta["vantage"], point)
+    dns_servers = VANTAGES[point]["dns"]
+    results = asyncio.run(_run(hosts, concurrency, dns_servers))
     retry = [h for h, r in results.items() if r["status"] in RETRY_STATUSES]
     if retry:
         log.info("re-probing %d hosts with transient failures", len(retry))
-        second = asyncio.run(_run(retry, max(4, concurrency // 4)))
+        second = asyncio.run(_run(retry, max(4, concurrency // 4), dns_servers))
         for host, rec in second.items():
             rec["attempts"] = 2
             if rec["status"] not in RETRY_STATUSES:
@@ -298,22 +326,50 @@ def run(hosts, month=None, concurrency=40, merge=False):
             else:
                 results[host]["attempts"] = 2
     meta["finished_at"] = utcnow().isoformat(timespec="seconds")
-    PROBES_DIR.mkdir(parents=True, exist_ok=True)
-    if merge and (PROBES_DIR / f"{month}.jsonl.gz").exists():
-        previous = load(month)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if merge and (out_dir / f"{month}.jsonl.gz").exists():
+        previous = load(month, point)
         previous.update(results)
         results = previous
-        meta_path = PROBES_DIR / f"{month}.meta.json"
+        meta_path = out_dir / f"{month}.meta.json"
         if meta_path.exists():
             old = json.loads(meta_path.read_text(encoding="utf-8"))
             old["reprobed"] = old.get("reprobed", 0) + len(hosts)
             old["reprobed_at"] = meta["finished_at"]
             meta = old
-    write_jsonl(PROBES_DIR / f"{month}.jsonl.gz", [results[h] for h in sorted(results)])
-    with open(PROBES_DIR / f"{month}.meta.json", "w", encoding="utf-8") as f:
+    write_jsonl(out_dir / f"{month}.jsonl.gz", [results[h] for h in sorted(results)])
+    with open(out_dir / f"{month}.meta.json", "w", encoding="utf-8") as f:
         json.dump(meta, f, ensure_ascii=False, indent=1)
     return results
 
 
-def load(month):
-    return {r["host"]: r for r in read_jsonl(PROBES_DIR / f"{month}.jsonl.gz")}
+def run_ru(extra_args=()):
+    """Run the Russian probe in its VPN container (scripts/probe-ru.sh); False if it did not run.
+
+    The tunnel lives inside the container, so the routing of this machine and the other
+    collectors running meanwhile stay on the foreign network.
+    """
+    try:
+        proc = subprocess.run([str(RU_SCRIPT), *extra_args], cwd=ROOT_DIR, check=False)
+    except OSError as e:
+        log.error("probe-ru: %s", e)
+        return False
+    if proc.returncode == 3:
+        log.warning("probe-ru skipped: no VPN config")
+    elif proc.returncode:
+        log.error("probe-ru failed with exit code %d", proc.returncode)
+    return proc.returncode == 0
+
+
+def latest_month(point="abroad"):
+    months = sorted(p.name.split(".")[0] for p in VANTAGES[point]["dir"].glob("*.jsonl.gz"))
+    return months[-1] if months else None
+
+
+def load_meta(month, point="abroad"):
+    path = VANTAGES[point]["dir"] / f"{month}.meta.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+
+
+def load(month, point="abroad"):
+    return {r["host"]: r for r in read_jsonl(VANTAGES[point]["dir"] / f"{month}.jsonl.gz")}

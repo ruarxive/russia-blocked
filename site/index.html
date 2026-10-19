@@ -14,7 +14,7 @@
 <meta property="og:locale" content="ru_RU">
 <meta property="og:locale:alternate" content="en_GB">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="assets/style.css?v=6">
+<link rel="stylesheet" href="assets/style.css?v=7">
 </head>
 <body>
 <header class="top">
@@ -95,7 +95,7 @@
   </section>
 
   <section id="access">
-    <h2 data-i18n="h_access">Доступность из-за рубежа</h2>
+    <h2 id="h-access" data-i18n="h_access">Доступность из-за рубежа</h2>
     <p class="section-lede" id="access-lede"></p>
 
     <figure class="card">
@@ -104,6 +104,15 @@
       <div class="legend" id="legend-live"></div>
       <div class="chart" id="chart-live"></div>
       <details class="tableview"><summary data-i18n="tableview">Таблица</summary><div class="scroll-x" id="tv-live"></div></details>
+    </figure>
+
+    <figure class="card" id="card-geo" hidden>
+      <h3 data-i18n="c_geo">Из-за рубежа и из России</h3>
+      <p class="sub" data-i18n="c_geo_sub"></p>
+      <div class="legend" id="legend-geo"></div>
+      <div class="chart" id="chart-geo"></div>
+      <details class="tableview"><summary data-i18n="tableview">Таблица</summary><div class="scroll-x" id="tv-geo"></div></details>
+      <details class="tableview"><summary data-i18n="geo_matrix">Статусы из-за рубежа и из России</summary><div class="scroll-x" id="tv-geo-matrix"></div></details>
     </figure>
 
     <div class="grid2">
@@ -144,6 +153,7 @@
           <th data-sort="h" data-i18n="th_site">Сайт</th>
           <th data-sort="c" class="hide-sm" data-i18n="th_category">Категория</th>
           <th data-sort="s" data-i18n="th_live">Из-за рубежа</th>
+          <th data-sort="rs" class="hide-sm ru-col" data-i18n="th_live_ru">Из России</th>
           <th class="hide-sm" data-i18n="th_vendor">Защита</th>
           <th data-sort="wl" data-i18n="th_last">Последний снимок</th>
           <th class="hide-sm" data-i18n="th_years">Снимки по годам</th>
@@ -194,7 +204,7 @@
 
 <div id="tooltip" role="tooltip" hidden></div>
 <dialog id="detail"></dialog>
-<script src="assets/i18n.js?v=6"></script>
-<script src="assets/app.js?v=6"></script>
+<script src="assets/i18n.js?v=7"></script>
+<script src="assets/app.js?v=7"></script>
 </body>
 </html>

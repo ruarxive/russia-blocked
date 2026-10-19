@@ -7,3 +7,4 @@ __pycache__/
 site/data/
 .claude/settings.local.json
 .claude/worktrees/
+secrets/

@@ -22,6 +22,8 @@ window.I18N = {
     owner: { person: "владелец — частное лицо", org: "владелец — организация" },
     asof: "Проверка доступности: {month}, точка наблюдения — {vantage}. Данные архивов обновлены {date}.",
     asof_noprobe: "Данные архивов обновлены {date}. Проверка доступности ещё не проводилась.",
+    asof_ru: " Проверка из России: {month}, {vantage}.",
+    hero_label_ru: "{pct} из них открываются из России ({n} из {total}): они закрыты именно для зарубежных посетителей",
     f_category: "Категория", f_region: "Регион", all: "Все", all_regions: "Все регионы",
     scope: "{n} сайтов в выборке",
     h_archive: "Архивирование в Wayback Machine",
@@ -42,6 +44,15 @@ window.I18N = {
     s_cc: "Скачаны в краулe",
     cc_pending: "Данные Common Crawl ещё собираются.",
     h_access: "Доступность из-за рубежа",
+    h_access_ru: "Доступность из-за рубежа и из России",
+    access_lede_ru: "Те же сайты проверены из российской сети ({vantage}, {month}), чтобы отличить блокировку зарубежных адресов от сайта, который не работает ни для кого.",
+    c_geo: "Из-за рубежа и из России",
+    c_geo_sub: "Работающие сайты, проверенные с обеих сторон границы",
+    geo_matrix: "Статусы из-за рубежа (строки) и из России (столбцы)",
+    geo: {
+      open: "Открыт из-за рубежа и из России", geoblock: "Закрыт только для зарубежных посетителей",
+      closed: "Не открывается и из России", ru_fail: "Не открывается только из России"
+    },
     access_lede: "Проверка {month} из {vantage}: DNS, подключение к портам 443 и 80, TLS-сертификат, ответ главной страницы и robots.txt. Так сайт видят краулеры зарубежных веб-архивов.",
     access_lede_none: "Проверка доступности ещё не проводилась.",
     c_live: "Результат проверки по категориям",
@@ -57,7 +68,7 @@ window.I18N = {
     tableview: "Таблица",
     h_domains: "Все сайты",
     search_ph: "Домен или организация",
-    th_site: "Сайт", th_category: "Категория", th_live: "Из-за рубежа", th_vendor: "Защита",
+    th_site: "Сайт", th_category: "Категория", th_live: "Из-за рубежа", th_live_ru: "Из России", th_vendor: "Защита",
     th_last: "Последний снимок", th_years: "Снимки по годам",
     more: "Показать ещё",
     shown: "Показано {shown} из {n}",
@@ -92,7 +103,8 @@ window.I18N = {
       shell: "Главная — JS-приложение без текста в HTML", offsite: "Перенаправляет на другой домен",
       free: "Домен истёк и свободен для регистрации"
     },
-    d_live: "Проверка из-за рубежа", d_archive: "Wayback Machine", d_years: "Последний снимок 200 по годам",
+    d_live: "Проверка из-за рубежа", d_live_ru: "Проверка из России", d_geo: "Сравнение",
+    d_archive: "Wayback Machine", d_years: "Последний снимок 200 по годам",
     d_cc: "Common Crawl по краулам", d_links: "Ссылки",
     d_status: "Статус", d_ip: "IP / сеть", d_ports: "Порты 443 / 80", d_tls: "TLS-сертификат", d_http: "HTTP-ответ",
     d_title: "Заголовок", d_vendors: "Защита / CDN", d_robots: "robots.txt", d_region: "Регион", d_org: "Организация",
@@ -127,7 +139,9 @@ window.I18N = {
 <li>Ответ классифицируется: содержимое, JS-оболочка, JS-проверка WAF, страница блокировки, пустой ответ или ошибка. JS-проверкой считается и маленькая страница без текста, которая только ставит cookie или перезагружает себя: краулеры, не исполняющие JavaScript, дальше неё не проходят. Защита определяется по заголовкам, cookie, CNAME и сети размещения.</li>
 <li>Домены с временными ошибками проверяются повторно.</li>
 </ul>
-<p><b>Ограничение.</b> Без точки наблюдения в России нельзя строго отличить геоблокировку от полной недоступности. Если DNS работает, IP находится в российской сети, а порты не отвечают, это почти всегда фильтрация зарубежных адресов, но не всегда. Адреса дата-центров часто блокируются строже домашних, однако именно с таких адресов работают краулеры архивов.</p>
+<h3>Проверка из России</h3>
+<p>Те же сайты в те же дни проверяются второй раз из российской сети через VPN-туннель, теми же правилами классификации; имена разрешаются через DNS Яндекса. Сайт, который не открывается из-за рубежа, но открывается из России, закрыт именно для зарубежных посетителей: это геоблокировка или правило WAF для иностранных адресов. Сайт, который не открывается с обеих сторон, просто не работает или закрыт для всех. Сеть российской точки наблюдения указана на странице.</p>
+<p><b>Ограничения.</b> Обе точки наблюдения — по одной сети. Адреса дата-центров и VPN часто блокируются строже домашних, поэтому часть сайтов может не открываться и из России, хотя у обычных российских пользователей работает. Если в месяце проверки из России не было, сравнение не показывается: тогда о геоблокировке можно судить только косвенно — DNS работает, IP в российской сети, а порты не отвечают.</p>
 <h3>Утраченные домены</h3>
 <p>Часть доменов из реестра больше не принадлежит государству: они истекли и перерегистрированы третьими лицами под казино, займы или копии старых госсайтов. Домен считается утраченным, если на нём спам, он припаркован или выставлен на продажу, либо по WHOIS (whois.tcinet.ru) создан после последнего обновления реестра (ноябрь 2022). Домены, созданные в 2021–2022 годах, считаются утраченными, только если их владелец — частное лицо или сайт размещён за пределами России. Утраченные и несуществующие домены не входят в доли доступности и архивации: архивы продолжают сохранять такие домены, но это уже не госсайты.</p>
 <h3>Архивы</h3>
@@ -142,7 +156,7 @@ window.I18N = {
     footer: `<p>Проект <a href="https://ruarxive.org">Ruarxive</a>. Данные: Internet Archive Wayback Machine, Common Crawl, govdomains, iptoasn.com.</p>
 <p>Все материалы и данные сайта доступны по лицензии <a href="https://creativecommons.org/licenses/by/4.0/deed.ru" rel="license">CC BY 4.0</a>, код сайта — по лицензии <a href="https://github.com/ruarxive/russia-blocked/blob/main/LICENSE" rel="license">MIT</a>. <a href="https://github.com/ruarxive/russia-blocked">Исходный код</a> · <a href="#feedback">Обратная связь</a></p>`,
     dl: {
-      domains: "Сводная таблица по сайтам (CSV)", registry: "Реестр доменов (CSV)", probe: "Проверка доступности {month} (JSONL)",
+      domains: "Сводная таблица по сайтам (CSV)", registry: "Реестр доменов (CSV)", probe: "Проверка доступности {month} (JSONL)", probe_ru: "Проверка из России {month} (JSONL)",
       snapshots: "Классификация снимков Wayback (JSONL)", cc: "Статистика Common Crawl по хостам (CSV)", summary: "Сводка (JSON)"
     }
   },
@@ -169,6 +183,8 @@ window.I18N = {
     owner: { person: "owner is a private person", org: "owner is an organization" },
     asof: "Access check: {month}, vantage point: {vantage}. Archive data updated {date}.",
     asof_noprobe: "Archive data updated {date}. No access check has run yet.",
+    asof_ru: " Check from Russia: {month}, {vantage}.",
+    hero_label_ru: "{pct} of them open from Russia ({n} of {total}): they are closed to foreign visitors only",
     f_category: "Category", f_region: "Region", all: "All", all_regions: "All regions",
     scope: "{n} sites selected",
     h_archive: "Archiving in the Wayback Machine",
@@ -189,6 +205,15 @@ window.I18N = {
     s_cc: "Fetched in crawl",
     cc_pending: "Common Crawl data is still being collected.",
     h_access: "Access from abroad",
+    h_access_ru: "Access from abroad and from Russia",
+    access_lede_ru: "The same sites are checked from a Russian network ({vantage}, {month}) to tell blocking of foreign addresses apart from a site that works for no one.",
+    c_geo: "From abroad and from Russia",
+    c_geo_sub: "Live sites checked from both sides of the border",
+    geo_matrix: "Status from abroad (rows) by status from Russia (columns)",
+    geo: {
+      open: "Open from abroad and from Russia", geoblock: "Closed only to foreign visitors",
+      closed: "Does not open from Russia either", ru_fail: "Does not open only from Russia"
+    },
     access_lede: "Check of {month} from {vantage}: DNS, connection to ports 443 and 80, TLS certificate, homepage response and robots.txt. This is how crawlers of foreign web archives see the sites.",
     access_lede_none: "No access check has run yet.",
     c_live: "Check result by category",
@@ -204,7 +229,7 @@ window.I18N = {
     tableview: "Table",
     h_domains: "All sites",
     search_ph: "Domain or organization",
-    th_site: "Site", th_category: "Category", th_live: "From abroad", th_vendor: "Protection",
+    th_site: "Site", th_category: "Category", th_live: "From abroad", th_live_ru: "From Russia", th_vendor: "Protection",
     th_last: "Last capture", th_years: "Captures by year",
     more: "Show more",
     shown: "Showing {shown} of {n}",
@@ -239,7 +264,8 @@ window.I18N = {
       shell: "Homepage is a JS app without text in HTML", offsite: "Redirects to another domain",
       free: "Domain expired and is free to register"
     },
-    d_live: "Check from abroad", d_archive: "Wayback Machine", d_years: "Last HTTP 200 capture by year",
+    d_live: "Check from abroad", d_live_ru: "Check from Russia", d_geo: "Comparison",
+    d_archive: "Wayback Machine", d_years: "Last HTTP 200 capture by year",
     d_cc: "Common Crawl by crawl", d_links: "Links",
     d_status: "Status", d_ip: "IP / network", d_ports: "Ports 443 / 80", d_tls: "TLS certificate", d_http: "HTTP response",
     d_title: "Title", d_vendors: "Protection / CDN", d_robots: "robots.txt", d_region: "Region", d_org: "Organization",
@@ -274,7 +300,9 @@ window.I18N = {
 <li>The response is classified as content, JS shell, WAF JS challenge, block page, empty response or error. A small page without text that only sets a cookie or reloads itself also counts as a JS challenge: crawlers that do not run JavaScript never get past it. Protection is detected from headers, cookies, CNAMEs and the hosting network.</li>
 <li>Domains with transient errors are checked twice.</li>
 </ul>
-<p><b>Limitation.</b> Without a vantage point inside Russia, geoblocking cannot be told apart from a site being down for everyone with certainty. When DNS works, the IP is in a Russian network and the ports do not answer, it is almost always filtering of foreign addresses, but not always. Data center addresses are often blocked more strictly than residential ones, yet this is exactly where archive crawlers run.</p>
+<h3>Check from Russia</h3>
+<p>On the same days the same sites are checked a second time from a Russian network through a VPN tunnel, with the same classification rules; names are resolved through Yandex DNS. A site that does not open from abroad but opens from Russia is closed specifically to foreign visitors: geoblocking or a WAF rule for foreign addresses. A site that does not open from either side is down or closed to everyone. The network of the Russian vantage point is shown on the page.</p>
+<p><b>Limitations.</b> Each vantage point is a single network. Data center and VPN addresses are often blocked more strictly than residential ones, so some sites may not open from Russia either even though they work for ordinary Russian users. When there was no check from Russia in a month, the comparison is not shown; geoblocking can then only be inferred: DNS works, the IP is in a Russian network and the ports do not answer.</p>
 <h3>Lost domains</h3>
 <p>Some registry domains no longer belong to the state: they expired and were registered again by third parties for casinos, loans or copies of old government sites. A domain counts as lost when it serves spam, is parked or offered for sale, or its WHOIS record (whois.tcinet.ru) shows it was created after the registry's last update (November 2022). Domains created in 2021–2022 count as lost only if the owner is a private person or the site is hosted outside Russia. Lost and non-existent domains are left out of the access and archiving shares: archives keep capturing them, but they are no longer government sites.</p>
 <h3>Archives</h3>
@@ -289,7 +317,7 @@ window.I18N = {
     footer: `<p>A <a href="https://ruarxive.org">Ruarxive</a> project. Data: Internet Archive Wayback Machine, Common Crawl, govdomains, iptoasn.com.</p>
 <p>All materials and data on this site are available under <a href="https://creativecommons.org/licenses/by/4.0/" rel="license">CC BY 4.0</a>; the site code is under the <a href="https://github.com/ruarxive/russia-blocked/blob/main/LICENSE" rel="license">MIT</a> license. <a href="https://github.com/ruarxive/russia-blocked">Source code</a> · <a href="#feedback">Feedback</a></p>`,
     dl: {
-      domains: "Per-site summary table (CSV)", registry: "Domain registry (CSV)", probe: "Access check {month} (JSONL)",
+      domains: "Per-site summary table (CSV)", registry: "Domain registry (CSV)", probe: "Access check {month} (JSONL)", probe_ru: "Check from Russia {month} (JSONL)",
       snapshots: "Wayback capture classification (JSONL)", cc: "Common Crawl host statistics (CSV)", summary: "Summary (JSON)"
     }
   }

@@ -1,9 +1,9 @@
 """Unit tests for the offline parts: python -m unittest discover tests"""
 import unittest
 
-from rublocked import fingerprint, registry, wayback
+from rublocked import build, fingerprint, registry, wayback
 from rublocked.common import month_range, normalize_host
-from rublocked.probe import derive_status, parse_robots
+from rublocked.probe import check_vantage, derive_status, parse_robots
 from rublocked.whois import registrable
 
 
@@ -160,6 +160,35 @@ class RegistryTest(unittest.TestCase):
     def test_region(self):
         self.assertEqual(registry.normalize_region("Ленинградская область,Санкт-Петербург"), "Ленинградская область")
         self.assertEqual(registry.normalize_region("Удмуртская республика"), "Удмуртская Республика")
+
+
+
+class VantageTest(unittest.TestCase):
+    def test_check_vantage(self):
+        check_vantage("ru", {"country": "RU"})
+        check_vantage("abroad", {"country": "DE"})
+        check_vantage("abroad", {"error": "ipinfo unreachable"})
+        with self.assertRaises(RuntimeError):
+            check_vantage("ru", {"country": "DE"})
+        with self.assertRaises(RuntimeError):
+            check_vantage("ru", {"error": "ipinfo unreachable"})
+        with self.assertRaises(RuntimeError):
+            check_vantage("abroad", {"country": "RU"})
+
+    def test_geo_class(self):
+        def geo(abroad, ru):
+            d = {"s": abroad, "g": build.STATUS_GROUP[abroad]}
+            build._add_ru(d, {"status": ru, "http": {}})
+            return d.get("geo")
+        self.assertEqual(geo("ok", "ok"), "open")
+        self.assertEqual(geo("timeout", "ok"), "geoblock")
+        self.assertEqual(geo("challenge", "ok"), "geoblock")
+        self.assertEqual(geo("timeout", "timeout"), "closed")
+        self.assertEqual(geo("ok", "refused"), "ru_fail")
+        self.assertIsNone(geo("dns", "ok"))
+        d = {"s": "ok", "g": "ok"}
+        build._add_ru(d, None)
+        self.assertNotIn("rs", d)
 
 
 if __name__ == "__main__":

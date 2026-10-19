@@ -25,6 +25,11 @@
   --a-bad: #eb6834;
   --a-none: #e1e0d9;
   --a-unknown: #f2f1ed;
+  /* Abroad vs Russia comparison, built on the status colours so both themes follow */
+  --geo-open: var(--g-ok);
+  --geo-geoblock: var(--g-waf);
+  --geo-closed: var(--g-noconn);
+  --geo-ru_fail: var(--g-error);
 
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --radius: 10px;
@@ -274,3 +279,6 @@ footer p { margin: 0 0 6px; }
 @media (forced-colors: active) {
   .sw, .minis b, .strip b { forced-color-adjust: none; }
 }
+
+/* The Russian check column is hidden until a month has one */
+.no-ru .ru-col { display: none; }

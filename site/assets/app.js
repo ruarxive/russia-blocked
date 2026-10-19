@@ -15,6 +15,8 @@
   };
   const GROUPS = ["ok", "waf", "noconn", "error", "gone"];
   const GROUP_ICON = { ok: "✓", waf: "!", noconn: "×", error: "?", gone: "–" };
+  // Live sites seen from abroad and from Russia (see build.GEO)
+  const GEO = ["open", "geoblock", "closed", "ru_fail"];
   const CATS = ["federal", "regional", "courts", "elections", "gis", "institution"];
   const SITE_URL = "https://ruarxive.org/russia-blocked/";
   const REPO_URL = "https://github.com/ruarxive/russia-blocked";
@@ -114,8 +116,9 @@
     document.getElementById("footer-text").innerHTML = t("footer");
   }
 
-  function vantageText() {
-    const v = state.summary.probe && state.summary.probe.vantage;
+  const hasRu = () => Boolean(state.summary.probe_ru && state.summary.probe_ru.month);
+  function vantageText(key = "probe") {
+    const v = state.summary[key] && state.summary[key].vantage;
     if (!v || !v.country) return "—";
     return [v.city, v.country].filter(Boolean).join(", ") + (v.org ? ` (${v.org})` : "");
   }
@@ -129,7 +132,12 @@
     const heroL = document.getElementById("hero-label");
     if (alive.length) {
       heroV.textContent = fmtPct(unreachable.length / alive.length);
-      heroL.textContent = t("hero_label", { n: fmtInt(unreachable.length), total: fmtInt(alive.length) });
+      // Of the sites that do not open from abroad, those that open from Russia are closed to foreign visitors only
+      const compared = unreachable.filter((d) => d.geo);
+      const geo = compared.filter((d) => d.geo === "geoblock");
+      heroL.replaceChildren(t("hero_label", { n: fmtInt(unreachable.length), total: fmtInt(alive.length) }),
+        ...(hasRu() && compared.length ? [el("br"), el("b", {}, t("hero_label_ru", {
+          n: fmtInt(geo.length), total: fmtInt(compared.length), pct: fmtPct(geo.length / compared.length) }))] : []));
     } else {
       heroV.textContent = "—";
       heroL.textContent = t("access_lede_none");
@@ -156,9 +164,10 @@
     document.getElementById("kpis").replaceChildren(...tiles.map(([l, v, n]) =>
       el("div", { class: "tile" }, el("div", { class: "label" }, l), el("div", { class: "value" }, v), el("div", { class: "note" }, n))));
     const date = new Date(state.summary.generated_at).toLocaleDateString(locale(), { day: "numeric", month: "long", year: "numeric" });
-    document.getElementById("asof").textContent = state.summary.probe && state.summary.probe.month
+    document.getElementById("asof").textContent = (state.summary.probe && state.summary.probe.month
       ? t("asof", { month: monthLabel(state.summary.probe.month), vantage: vantageText(), date })
-      : t("asof_noprobe", { date });
+      : t("asof_noprobe", { date }))
+      + (hasRu() ? t("asof_ru", { month: monthLabel(state.summary.probe_ru.month), vantage: vantageText("probe_ru") }) : "");
     document.querySelector(".lede").textContent = t("lede", { n: fmtInt(all.length) });
   }
 
@@ -177,7 +186,9 @@
 
     const st = document.getElementById("f-status");
     st.replaceChildren(el("option", { value: "all" }, t("any_status")),
-      ...GROUPS.map((g) => el("option", { value: "g:" + g }, t("group." + g))));
+      el("optgroup", { label: t("th_live") }, GROUPS.map((g) => el("option", { value: "g:" + g }, t("group." + g)))),
+      hasRu() ? el("optgroup", { label: t("c_geo") }, GEO.map((k) => el("option", { value: "geo:" + k }, t("geo." + k)))) : null);
+    if (state.status.startsWith("geo:") && !hasRu()) state.status = "all";
     st.value = state.status;
     const ar = document.getElementById("f-archived");
     ar.replaceChildren(...["any", "recent", "stale", "never"].map((k) => el("option", { value: k === "any" ? "all" : k }, t("arch_" + k))));
@@ -435,20 +446,14 @@
   }
 
   // ---------- live access ----------
-  function renderLive() {
-    const probe = state.summary.probe || {};
-    document.getElementById("access-lede").textContent = probe.month
-      ? t("access_lede", { month: monthLabel(probe.month), vantage: vantageText() }) : t("access_lede_none");
-    document.getElementById("legend-live").replaceChildren(...GROUPS.map((g) =>
-      el("span", {}, el("span", { class: "sw", style: `background:${css("--g-" + g)}` }), t("group." + g))));
-    const base = state.domains.filter((d) => d.s && (state.region === "all" || d.r === state.region));
+  // One horizontal 100% bar per category; keys are the segments, valueOf gives a site's key
+  function categoryBars(box, tableBox, base, keys, valueOf, colorOf, labelOf, ariaLabel) {
     const rows = [["all", base], ...CATS.map((c) => [c, base.filter((d) => d.c === c)])].filter(([, ds]) => ds.length);
-    const box = document.getElementById("chart-live");
     const W = Math.max(300, box.clientWidth);
     const labelW = Math.min(230, W * 0.36), rowH = 22, gapY = 14;
     const H = rows.length * (rowH + gapY) + 4;
     const iw = W - labelW - 12;
-    const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": t("c_live") });
+    const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": ariaLabel });
     const table = [];
     rows.forEach(([cat, ds], ri) => {
       const y = ri * (rowH + gapY) + 2;
@@ -456,15 +461,15 @@
       const g = s("g", { class: dim ? "dim" : null });
       g.append(s("text", { x: 0, y: y + rowH / 2 + 4, class: cat === "all" ? "label-strong" : "label-ink" }, `${t("cat." + cat)} · ${fmtInt(ds.length)}`));
       let acc = 0;
-      const cnt = Object.fromEntries(GROUPS.map((k) => [k, ds.filter((d) => d.g === k).length]));
-      table.push([t("cat." + cat), ...GROUPS.map((k) => `${fmtInt(cnt[k])} (${fmtPct(cnt[k] / ds.length)})`)]);
-      const segs = GROUPS.filter((k) => cnt[k] > 0);
+      const cnt = Object.fromEntries(keys.map((k) => [k, ds.filter((d) => valueOf(d) === k).length]));
+      table.push([t("cat." + cat), ...keys.map((k) => `${fmtInt(cnt[k])} (${fmtPct(cnt[k] / ds.length)})`)]);
+      const segs = keys.filter((k) => cnt[k] > 0);
       segs.forEach((k, si) => {
         const w = (cnt[k] / ds.length) * iw;
         const x = labelW + acc;
-        const p = s("path", { class: "mark", d: barPath(x, y, Math.max(0, w - (si < segs.length - 1 ? 2 : 0)), rowH, si === segs.length - 1 ? "right" : null), fill: css("--g-" + k), tabindex: 0 });
+        const p = s("path", { class: "mark", d: barPath(x, y, Math.max(0, w - (si < segs.length - 1 ? 2 : 0)), rowH, si === segs.length - 1 ? "right" : null), fill: colorOf(k), tabindex: 0 });
         p.addEventListener("pointermove", (e) => showTip(e, [el("div", { class: "tl" }, t("cat." + cat)),
-          tipValue(fmtPct(cnt[k] / ds.length), `${t("group." + k)} · ${fmtInt(cnt[k])}`, css("--g-" + k))]));
+          tipValue(fmtPct(cnt[k] / ds.length), `${labelOf(k)} · ${fmtInt(cnt[k])}`, colorOf(k))]));
         p.addEventListener("pointerleave", hideTip);
         g.append(p);
         if (w > 44) g.append(s("text", { x: x + 6, y: y + rowH / 2 + 4, style: "fill:#fff;font-weight:600;pointer-events:none" }, fmtPct(cnt[k] / ds.length)));
@@ -473,7 +478,39 @@
       svg.append(g);
     });
     box.replaceChildren(svg);
-    dataTable(document.getElementById("tv-live"), [t("category"), ...GROUPS.map((k) => t("group." + k))], table);
+    dataTable(tableBox, [t("category"), ...keys.map(labelOf)], table);
+  }
+  const legend = (box, keys, colorOf, labelOf) => box.replaceChildren(...keys.map((k) =>
+    el("span", {}, el("span", { class: "sw", style: `background:${colorOf(k)}` }), labelOf(k))));
+
+  function renderLive() {
+    const probe = state.summary.probe || {};
+    const ru = state.summary.probe_ru || {};
+    document.getElementById("h-access").textContent = t(hasRu() ? "h_access_ru" : "h_access");
+    document.getElementById("access-lede").textContent = (probe.month
+      ? t("access_lede", { month: monthLabel(probe.month), vantage: vantageText() }) : t("access_lede_none"))
+      + (hasRu() ? " " + t("access_lede_ru", { month: monthLabel(ru.month), vantage: vantageText("probe_ru") }) : "");
+    const color = (g) => css("--g-" + g), label = (g) => t("group." + g);
+    legend(document.getElementById("legend-live"), GROUPS, color, label);
+    const base = state.domains.filter((d) => d.s && (state.region === "all" || d.r === state.region));
+    categoryBars(document.getElementById("chart-live"), document.getElementById("tv-live"), base, GROUPS,
+      (d) => d.g, color, label, t("c_live"));
+  }
+
+  function renderGeo() {
+    const card = document.getElementById("card-geo");
+    card.hidden = !hasRu();
+    if (card.hidden) return;
+    const color = (k) => css("--geo-" + k), label = (k) => t("geo." + k);
+    legend(document.getElementById("legend-geo"), GEO, color, label);
+    const base = state.domains.filter((d) => d.geo && (state.region === "all" || d.r === state.region));
+    categoryBars(document.getElementById("chart-geo"), document.getElementById("tv-geo"), base, GEO,
+      (d) => d.geo, color, label, t("c_geo"));
+    // Status from abroad by status from Russia, for the sites in the current filter
+    const sc = scoped().filter((d) => d.geo);
+    const rowsKeys = GROUPS.filter((g) => g !== "gone");
+    dataTable(document.getElementById("tv-geo-matrix"), [t("th_live") + " \\ " + t("th_live_ru"), ...GROUPS.map((g) => t("group." + g))],
+      rowsKeys.map((a) => [t("group." + a), ...GROUPS.map((r) => fmtInt(sc.filter((d) => d.g === a && d.rg === r).length))]));
   }
 
   function barList(container, items, colorFor) {
@@ -518,11 +555,13 @@
   }
 
   // ---------- table ----------
-  function statusBadge(d) {
-    if (!d.s) return el("span", { class: "statusbadge" }, "—");
-    return el("span", { class: "statusbadge", title: d.hr || "" },
-      el("i", { style: `background:${css("--g-" + d.g)}` }, GROUP_ICON[d.g] || ""), t("status." + d.s));
+  function badge(status, group, reason) {
+    if (!status) return el("span", { class: "statusbadge" }, "—");
+    return el("span", { class: "statusbadge", title: reason || "" },
+      el("i", { style: `background:${css("--g-" + group)}` }, GROUP_ICON[group] || ""), t("status." + status));
   }
+  const statusBadge = (d) => badge(d.s, d.g, d.hr);
+  const ruBadge = (d) => badge(d.rs, d.rg, d.rhr);
   function minis(d) {
     const map = { c: "--a-content", s: "--a-shell", bad: "--a-bad", n: "--a-none", u: "--a-unknown" };
     return el("span", { class: "minis" }, state.summary.years.map((y, i) => {
@@ -538,6 +577,7 @@
     let rows = scoped().filter((d) => {
       if (q && !(d.h.includes(q) || d.d.toLowerCase().includes(q) || (d.n || "").toLowerCase().includes(q) || (d.o || "").toLowerCase().includes(q))) return false;
       if (state.status.startsWith("g:") && d.g !== state.status.slice(2)) return false;
+      if (state.status.startsWith("geo:") && d.geo !== state.status.slice(4)) return false;
       if (state.archived === "recent" && !(d.wl && d.wl >= cutoff)) return false;
       if (state.archived === "stale" && !(d.wl && d.wl < cutoff)) return false;
       if (state.archived === "never" && d.wl) return false;
@@ -552,12 +592,14 @@
   }
   function renderTable() {
     const rows = filteredTable();
+    document.getElementById("domains-table").classList.toggle("no-ru", !hasRu());
     const tbody = document.querySelector("#domains-table tbody");
     tbody.replaceChildren(...rows.slice(0, state.shown).map((d) => el("tr", {},
       el("td", {}, el("a", { class: "host", href: "#site=" + encodeURIComponent(d.h), onclick: (e) => { e.preventDefault(); openDetail(d); } }, d.d),
         el("div", { class: "org" }, d.n || d.o || "")),
       el("td", { class: "hide-sm" }, t("cat." + d.c)),
       el("td", {}, statusBadge(d)),
+      el("td", { class: "hide-sm ru-col", title: d.geo ? t("geo." + d.geo) : null }, ruBadge(d)),
       el("td", { class: "hide-sm" }, (d.v || []).join(", ")),
       el("td", {}, d.wl ? d.wl : t("never")),
       el("td", { class: "hide-sm" }, minis(d)))));
@@ -607,6 +649,11 @@
           [t("d_lost"), d.lr ? (d.lr.startsWith("spam:") ? t("lost_spam", { m: d.lr.slice(5) }) : t("lost_rereg", { date: d.lr.slice(6) })) : null],
           [t("d_whois"), d.wc || d.wr || d.free ? (d.free ? t("barrier.free") : [d.wc && t("whois_created", { date: d.wc }), d.wr, d.wo && t("owner." + d.wo)].filter(Boolean).join(" · ")) : null],
         ]),
+        d.rs ? [el("h4", {}, t("d_live_ru")), kv([
+          [t("d_status"), ruBadge(d)],
+          [t("d_http"), d.rhs ? `${d.rhs} · ${d.rhk || ""}${d.rhr ? " · " + d.rhr : ""}` : d.rhr],
+          [t("d_geo"), d.geo ? t("geo." + d.geo) : null],
+        ])] : null,
         el("h4", {}, t("d_archive")),
         kv([[t("d_captures"), fmtInt(d.wn)], [t("d_lastok"), d.wl || t("never")], [t("d_cohort"), d.co ? t("yes") : t("no")]]),
         el("div", { class: "stripwrap" }, strip, yearsRow),
@@ -630,6 +677,7 @@
       ["data/download/domains.csv.gz", t("dl.domains")],
       ["data/download/registry.csv", t("dl.registry")],
       pm ? [`data/download/probe_${pm}.jsonl.gz`, t("dl.probe", { month: pm })] : null,
+      hasRu() ? [`data/download/probe_ru_${state.summary.probe_ru.month}.jsonl.gz`, t("dl.probe_ru", { month: state.summary.probe_ru.month })] : null,
       ["data/download/wayback_snapshots.jsonl.gz", t("dl.snapshots")],
       ["data/download/commoncrawl_hosts.csv.gz", t("dl.cc")],
       ["data/summary.json", t("dl.summary")],
@@ -717,7 +765,7 @@
   function renderScoped() {
     renderFilters();
     renderTimeline(); renderQuality(); renderGaps(); renderHeat(); renderCC();
-    renderLive(); renderAccessLists(); renderTable();
+    renderLive(); renderGeo(); renderAccessLists(); renderTable();
   }
   function renderAll() {
     applyStatic();

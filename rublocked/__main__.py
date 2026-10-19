@@ -15,7 +15,9 @@ def main():
 
     p = sub.add_parser("probe", help="probe all registry hosts from this vantage point")
     p.add_argument("--month", default=None)
-    p.add_argument("--concurrency", type=int, default=40)
+    p.add_argument("--vantage", choices=["abroad", "ru"], default="abroad",
+                   help="side of the border the network is on; ru runs inside the VPN container (scripts/probe-ru.sh)")
+    p.add_argument("--concurrency", type=int, default=None, help="parallel hosts (default 40 abroad, 10 from Russia)")
     p.add_argument("--limit", type=int, default=0, help="probe only the first N hosts (testing)")
     p.add_argument("--hosts", nargs="*", help="probe only these hosts")
 
@@ -35,7 +37,8 @@ def main():
     sub.add_parser("build", help="aggregate data into site/data/*.json")
 
     m = sub.add_parser("monthly", help="the monthly run: probe, wayback, snapshots, commoncrawl, build")
-    m.add_argument("--skip", nargs="*", default=[], choices=["probe", "whois", "wayback", "snapshots", "commoncrawl"])
+    m.add_argument("--skip", nargs="*", default=[],
+                   choices=["probe", "probe-ru", "whois", "wayback", "snapshots", "commoncrawl"])
 
     args = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
@@ -56,7 +59,8 @@ def main():
         if args.hosts:
             from .common import normalize_host
             hosts = [normalize_host(h) for arg in args.hosts for h in arg.split()]
-        probe.run(hosts, month=args.month, concurrency=args.concurrency, merge=bool(args.hosts))
+        concurrency = args.concurrency or (10 if args.vantage == "ru" else 40)
+        probe.run(hosts, month=args.month, concurrency=concurrency, merge=bool(args.hosts), point=args.vantage)
     elif args.command == "wayback":
         from . import wayback
         wayback.update_sparklines(hosts, force=args.force)
@@ -76,6 +80,9 @@ def main():
         from . import build, commoncrawl, probe, wayback, whois
         if "probe" not in args.skip:
             probe.run(hosts, month=current_month())
+        if "probe-ru" not in args.skip:
+            # Right after the foreign probe, so both views describe the same days
+            probe.run_ru()
         if "whois" not in args.skip:
             whois.update(hosts)
         if "wayback" not in args.skip:
