@@ -9,7 +9,7 @@ SITE_DIR = ROOT_DIR / "site"
 
 # Identify the monitor honestly to archive services; probes of the measured sites use a
 # browser user agent instead, because many WAFs block unknown agents outright.
-MONITOR_UA = "ruarxive-blocked-monitor/0.1 (+https://monitor.ruarxive.org; archivability research)"
+MONITOR_UA = "ruarxive-blocked-monitor/0.1 (+https://ruarxive.org/russia-blocked/; archivability research)"
 BROWSER_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 

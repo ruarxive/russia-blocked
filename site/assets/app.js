@@ -16,7 +16,7 @@
   const GROUPS = ["ok", "waf", "noconn", "error", "gone"];
   const GROUP_ICON = { ok: "✓", waf: "!", noconn: "×", error: "?", gone: "–" };
   const CATS = ["federal", "regional", "courts", "elections", "gis", "institution"];
-  const SITE_URL = "https://monitor.ruarxive.org/";
+  const SITE_URL = "https://ruarxive.org/russia-blocked/";
   const REPO_URL = "https://github.com/ruarxive/russia-blocked";
   const FEEDBACK_EMAIL = "ivan.begtin@infoculture.ru";
 
