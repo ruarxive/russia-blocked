@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>org.ruarxive.russia-blocked</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>/Users/ibegtin/workspace/ruarxive/russia-blocked/scripts/monthly.sh</string>
+  </array>
+  <!-- 03:00 on the 2nd day of every month, so the previous month is complete -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Day</key>
+    <integer>2</integer>
+    <key>Hour</key>
+    <integer>3</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/ibegtin/workspace/ruarxive/russia-blocked/logs/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/ibegtin/workspace/ruarxive/russia-blocked/logs/launchd.log</string>
+</dict>
+</plist>

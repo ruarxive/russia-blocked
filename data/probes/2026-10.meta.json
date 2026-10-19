@@ -1,0 +1,12 @@
+{
+ "month": "2026-10",
+ "started_at": "2026-10-19T03:59:19+00:00",
+ "vantage": {
+  "ip": "159.223.30.24",
+  "country": "DE",
+  "city": "Frankfurt am Main",
+  "org": "AS14061 DigitalOcean, LLC"
+ },
+ "hosts": 2254,
+ "finished_at": "2026-10-19T04:25:11+00:00"
+}

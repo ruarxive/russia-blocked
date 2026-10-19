@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Госсайты вне архива</title>
+<meta name="description" content="Ежемесячный мониторинг доступности российских государственных сайтов из-за рубежа и их сохранности в веб-архивах с 2019 года.">
+<link rel="canonical" href="https://monitor.ruarxive.org/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Ruarxive">
+<meta property="og:url" content="https://monitor.ruarxive.org/">
+<meta property="og:title" content="Госсайты вне архива">
+<meta property="og:description" content="Ежемесячный мониторинг доступности российских государственных сайтов из-за рубежа и их сохранности в веб-архивах с 2019 года.">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:locale:alternate" content="en_GB">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="assets/style.css?v=6">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span data-i18n="brand">Госсайты вне архива</span><small>ruarxive</small></div>
+    <nav>
+      <a href="#archive" data-i18n="nav_archive">Архивирование</a>
+      <a href="#access" data-i18n="nav_access">Доступность</a>
+      <a href="#domains" data-i18n="nav_domains">Сайты</a>
+      <a href="#method" data-i18n="nav_method">Методика и данные</a>
+      <a href="#feedback" data-i18n="nav_feedback">Обратная связь</a>
+    </nav>
+    <div class="toggles">
+      <button class="btn" id="lang-toggle" type="button">EN</button>
+      <button class="btn" id="theme-toggle" type="button" aria-label="Theme">◐</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero" id="overview">
+    <h1 data-i18n="title">Российские госсайты уходят из веб-архивов</h1>
+    <p class="lede" data-i18n="lede"></p>
+    <div class="hero-figure"><span class="value" id="hero-value">—</span><span class="label" id="hero-label"></span></div>
+    <div class="kpis" id="kpis"></div>
+    <p class="asof" id="asof"></p>
+  </section>
+
+  <div class="filters" id="filters">
+    <label><span data-i18n="f_category">Категория</span>
+      <select id="f-category"></select></label>
+    <label><span data-i18n="f_region">Регион</span>
+      <select id="f-region"></select></label>
+    <span class="scope-note" id="scope-note"></span>
+  </div>
+
+  <section id="archive">
+    <h2 data-i18n="h_archive">Архивирование в Wayback Machine</h2>
+    <p class="section-lede" data-i18n="archive_lede"></p>
+
+    <figure class="card">
+      <h3 data-i18n="c_timeline">Доля сайтов, сохранённых в Wayback Machine, по месяцам</h3>
+      <p class="sub" data-i18n="c_timeline_sub"></p>
+      <div class="chart" id="chart-timeline"></div>
+      <details class="tableview"><summary data-i18n="tableview">Таблица</summary><div class="scroll-x" id="tv-timeline"></div></details>
+    </figure>
+
+    <div class="grid2">
+      <figure class="card">
+        <h3 data-i18n="c_quality">Что сохранено: последний снимок главной страницы за год</h3>
+        <p class="sub" data-i18n="c_quality_sub"></p>
+        <div class="legend" id="legend-quality"></div>
+        <div class="chart" id="chart-quality"></div>
+        <details class="tableview"><summary data-i18n="tableview">Таблица</summary><div class="scroll-x" id="tv-quality"></div></details>
+      </figure>
+      <figure class="card">
+        <h3 data-i18n="c_gaps">Сколько месяцев сайт не архивировался</h3>
+        <p class="sub" data-i18n="c_gaps_sub"></p>
+        <div class="chart" id="chart-gaps"></div>
+        <details class="tableview"><summary data-i18n="tableview">Таблица</summary><div class="scroll-x" id="tv-gaps"></div></details>
+      </figure>
+    </div>
+
+    <figure class="card">
+      <h3 data-i18n="c_heat">Каждый сайт — строка, каждый месяц — клетка</h3>
+      <p class="sub" data-i18n="c_heat_sub"></p>
+      <div class="legend" id="legend-heat"></div>
+      <div class="heat-axis" id="heat-axis"></div>
+      <div class="heatwrap" id="heatwrap"><canvas id="heat"></canvas></div>
+    </figure>
+
+    <figure class="card">
+      <h3 data-i18n="c_cc">Common Crawl: сайты, успешно скачанные в каждом краулe</h3>
+      <p class="sub" data-i18n="c_cc_sub"></p>
+      <div class="chart" id="chart-cc"></div>
+      <details class="tableview"><summary data-i18n="tableview">Таблица</summary><div class="scroll-x" id="tv-cc"></div></details>
+    </figure>
+  </section>
+
+  <section id="access">
+    <h2 data-i18n="h_access">Доступность из-за рубежа</h2>
+    <p class="section-lede" id="access-lede"></p>
+
+    <figure class="card">
+      <h3 data-i18n="c_live">Результат проверки по категориям</h3>
+      <p class="sub" data-i18n="c_live_sub"></p>
+      <div class="legend" id="legend-live"></div>
+      <div class="chart" id="chart-live"></div>
+      <details class="tableview"><summary data-i18n="tableview">Таблица</summary><div class="scroll-x" id="tv-live"></div></details>
+    </figure>
+
+    <div class="grid2">
+      <figure class="card">
+        <h3 data-i18n="c_reasons">Причины недоступности</h3>
+        <p class="sub" data-i18n="c_reasons_sub"></p>
+        <div class="barlist" id="list-reasons"></div>
+      </figure>
+      <figure class="card">
+        <h3 data-i18n="c_barriers">Другие барьеры для архивации</h3>
+        <p class="sub" data-i18n="c_barriers_sub"></p>
+        <div class="barlist" id="list-barriers"></div>
+      </figure>
+      <figure class="card">
+        <h3 data-i18n="c_vendors">Защита от DDoS, WAF и CDN</h3>
+        <p class="sub" data-i18n="c_vendors_sub"></p>
+        <div class="barlist" id="list-vendors"></div>
+      </figure>
+      <figure class="card">
+        <h3 data-i18n="c_hosting">Где размещены сайты</h3>
+        <p class="sub" data-i18n="c_hosting_sub"></p>
+        <div class="barlist" id="list-asn"></div>
+      </figure>
+    </div>
+  </section>
+
+  <section id="domains">
+    <h2 data-i18n="h_domains">Все сайты</h2>
+    <div class="table-controls">
+      <input type="search" id="q" data-i18n-placeholder="search_ph" placeholder="Домен или организация">
+      <select id="f-status"></select>
+      <select id="f-archived"></select>
+      <span class="scope-note" id="table-count"></span>
+    </div>
+    <div class="scroll-x">
+      <table class="datatable" id="domains-table">
+        <thead><tr>
+          <th data-sort="h" data-i18n="th_site">Сайт</th>
+          <th data-sort="c" class="hide-sm" data-i18n="th_category">Категория</th>
+          <th data-sort="s" data-i18n="th_live">Из-за рубежа</th>
+          <th class="hide-sm" data-i18n="th_vendor">Защита</th>
+          <th data-sort="wl" data-i18n="th_last">Последний снимок</th>
+          <th class="hide-sm" data-i18n="th_years">Снимки по годам</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <button class="btn more" id="more" type="button" data-i18n="more">Показать ещё</button>
+  </section>
+
+  <section id="method" class="method">
+    <h2 data-i18n="h_method">Методика и данные</h2>
+    <div id="method-text"></div>
+    <h3 data-i18n="h_downloads">Открытые данные</h3>
+    <ul class="downloads" id="downloads"></ul>
+  </section>
+
+  <section id="feedback" class="feedback">
+    <h2 data-i18n="h_feedback">Обратная связь</h2>
+    <p class="section-lede" data-i18n="feedback_lede"></p>
+    <form class="card fb-form" id="fb-form" novalidate>
+      <fieldset class="fb-types">
+        <legend data-i18n="fb_type">Тема</legend>
+        <label><input type="radio" name="fb-type" value="error" checked> <span data-i18n="fb_types.error">Неточность в данных</span></label>
+        <label><input type="radio" name="fb-type" value="idea"> <span data-i18n="fb_types.idea">Предложение</span></label>
+        <label><input type="radio" name="fb-type" value="other"> <span data-i18n="fb_types.other">Другое</span></label>
+      </fieldset>
+      <label class="fb-field"><span data-i18n="fb_site">Сайт (если сообщение о конкретном сайте)</span>
+        <input type="text" id="fb-site" list="fb-sites" autocomplete="off" spellcheck="false" maxlength="200" data-i18n-placeholder="fb_site_ph"></label>
+      <datalist id="fb-sites"></datalist>
+      <label class="fb-field"><span data-i18n="fb_message">Сообщение</span>
+        <textarea id="fb-message" rows="6" maxlength="3000" required></textarea></label>
+      <label class="fb-field"><span data-i18n="fb_contact">Как с вами связаться</span>
+        <input type="text" id="fb-contact" autocomplete="email" maxlength="200" data-i18n-placeholder="fb_contact_ph"></label>
+      <p class="fb-msg" id="fb-msg" role="status" hidden></p>
+      <div class="fb-actions">
+        <button class="btn primary" type="submit" value="github" data-i18n="fb_github">Создать issue на GitHub</button>
+        <button class="btn" type="submit" value="email" data-i18n="fb_email">Отправить письмо</button>
+      </div>
+      <p class="sub fb-note"></p>
+    </form>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap" id="footer-text"></div>
+</footer>
+
+<div id="tooltip" role="tooltip" hidden></div>
+<dialog id="detail"></dialog>
+<script src="assets/i18n.js?v=6"></script>
+<script src="assets/app.js?v=6"></script>
+</body>
+</html>
