@@ -111,6 +111,18 @@ cp scripts/org.ruarxive.russia-blocked.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/org.ruarxive.russia-blocked.plist
 ```
 
+## Deploy
+
+The site is served by GitHub Pages at <https://monitor.ruarxive.org>.
+`.github/workflows/pages.yml` runs on every push to `main` (and by hand from the Actions
+tab): it installs the requirements, runs `python -m rublocked build` on the committed
+`data/` (no network access needed) and deploys `site/` with the generated `site/data/`.
+`site/data/` is not kept in the repository, so after the monthly run commit and push
+`data/` to update the site.
+
+The repository's Pages source is "GitHub Actions" and its custom domain is
+`monitor.ruarxive.org`, with a DNS record `CNAME monitor → ruarxive.github.io`.
+
 ## Limits
 
 * Without a vantage point inside Russia, geoblocking cannot be told apart from a site
